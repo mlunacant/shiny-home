@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Trash2, Plus, Home, ClipboardList, Edit, X, Check } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import type { House, Room, Task } from "@/lib/types"
 
 export default function Setup() {
@@ -39,7 +39,6 @@ export default function Setup() {
     roomId: "",
     periodicity: "weekly",
   })
-  const { toast } = useToast()
 
   useEffect(() => {
     // Load house, rooms and tasks from localStorage
@@ -63,30 +62,18 @@ export default function Setup() {
   // House functions
   const saveHouse = () => {
     if (!house.name) {
-      toast({
-        title: "Error",
-        description: "Please enter a house name",
-        variant: "destructive",
-      })
+      toast.error("Please enter a house name")
       return
     }
 
     localStorage.setItem("house-details", JSON.stringify(house))
-
-    toast({
-      title: "House saved",
-      description: "Your house details have been saved successfully",
-    })
+    toast.success("Your house details have been saved successfully")
   }
 
   // Room functions
   const addRoom = () => {
     if (!newRoom.name) {
-      toast({
-        title: "Error",
-        description: "Please enter a room name",
-        variant: "destructive",
-      })
+      toast.error("Please enter a room name")
       return
     }
 
@@ -97,10 +84,7 @@ export default function Setup() {
     localStorage.setItem("house-rooms", JSON.stringify(updatedRooms))
     setNewRoom({ name: "", type: "" })
 
-    toast({
-      title: "Room added",
-      description: `${newRoom.name} has been added to your house`,
-    })
+    toast.success(`${newRoom.name} has been added to your house`)
   }
 
   const deleteRoom = (roomId: string) => {
@@ -108,11 +92,7 @@ export default function Setup() {
     const linkedTasks = tasks.filter((task) => task.roomId === roomId)
 
     if (linkedTasks.length > 0) {
-      toast({
-        title: "Cannot delete room",
-        description: `This room has ${linkedTasks.length} tasks linked to it. Delete the tasks first.`,
-        variant: "destructive",
-      })
+      toast.error(`This room has ${linkedTasks.length} tasks linked to it. Delete the tasks first.`)
       return
     }
 
@@ -120,20 +100,13 @@ export default function Setup() {
     setRooms(updatedRooms)
     localStorage.setItem("house-rooms", JSON.stringify(updatedRooms))
 
-    toast({
-      title: "Room deleted",
-      description: "The room has been removed from your house",
-    })
+    toast.success("The room has been removed from your house")
   }
 
   // Task functions
   const addTask = () => {
     if (!newTask.name || !newTask.roomId || !newTask.periodicity) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
+      toast.error("Please fill in all required fields")
       return
     }
 
@@ -163,10 +136,7 @@ export default function Setup() {
       periodicity: "weekly",
     })
 
-    toast({
-      title: "Task added",
-      description: `${newTask.name} has been added to your cleaning schedule`,
-    })
+    toast.success(`${newTask.name} has been added to your cleaning schedule`)
   }
 
   const startEditTask = (task: Task) => {
@@ -185,11 +155,7 @@ export default function Setup() {
 
   const saveEditTask = (taskId: string) => {
     if (!editTaskData.name || !editTaskData.roomId || !editTaskData.periodicity) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
+      toast.error("Please fill in all required fields")
       return
     }
 
@@ -210,10 +176,7 @@ export default function Setup() {
     localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
     setEditingTask(null)
 
-    toast({
-      title: "Task updated",
-      description: "The task has been updated successfully",
-    })
+    toast.success("The task has been updated successfully")
   }
 
   const deleteTask = (taskId: string) => {
@@ -221,10 +184,7 @@ export default function Setup() {
     setTasks(updatedTasks)
     localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
 
-    toast({
-      title: "Task deleted",
-      description: "The task has been removed from your cleaning schedule",
-    })
+    toast.success("The task has been removed from your cleaning schedule")
   }
 
   const getNextDueDate = (date: Date, periodicity: string): string => {
