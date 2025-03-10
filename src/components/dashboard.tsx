@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, AlertCircle, Clock } from "lucide-react"
+import { toast } from "sonner"
 import type { Task, Room } from "@/lib/types"
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
-  
 
   useEffect(() => {
     // Load tasks and rooms from localStorage
@@ -41,7 +41,10 @@ export default function Dashboard() {
 
     setTasks(updatedTasks)
     localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
-   
+
+    toast.success("Task completed!", {
+      description: "The task has been marked as done.",
+    })
   }
 
   const getNextDueDate = (date: Date, periodicity: string): string => {
@@ -138,7 +141,7 @@ export default function Dashboard() {
                             Overdue by {Math.abs(daysLeft)} days
                           </Badge>
                         ) : (
-                          <Badge variant="warning" className="flex items-center gap-1 bg-yellow-500">
+                          <Badge variant="secondary" className="flex items-center gap-1 bg-yellow-500">
                             <Clock className="h-3 w-3" />
                             Due in {daysLeft} days
                           </Badge>
@@ -183,7 +186,7 @@ export default function Dashboard() {
                             Overdue by {Math.abs(daysLeft)} days
                           </Badge>
                         ) : status === "due-soon" ? (
-                          <Badge variant="warning" className="flex items-center gap-1 bg-yellow-500">
+                          <Badge variant="secondary" className="flex items-center gap-1 bg-yellow-500">
                             <Clock className="h-3 w-3" />
                             Due in {daysLeft} days
                           </Badge>
