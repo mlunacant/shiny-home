@@ -46,13 +46,6 @@ export default function Dashboard() {
     return room ? room.color : "#e5e7eb" // default to gray if room not found
   }
 
-  const getTasksNeedingAttention = () => {
-    return tasks.filter((task) => {
-      const nextDue = new Date(task.nextDue)
-      return nextDue <= today
-    })
-  }
-
   const getTasksDueNextWeek = () => {
     const nextWeek = new Date(today)
     nextWeek.setDate(today.getDate() + 7)
