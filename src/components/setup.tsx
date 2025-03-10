@@ -297,7 +297,7 @@ export default function Setup() {
   }
 
   const getPeriodicityLabel = (periodicity: { value: number, unit: "days" | "weeks" | "months" }): string => {
-    const unit = t.frequency[periodicity.unit]
+    const unit = t.frequency[periodicity.unit] || periodicity.unit;
     return replaceParams(t.frequency.every, { value: periodicity.value, unit: unit.toLowerCase() })
   }
 
@@ -757,7 +757,7 @@ export default function Setup() {
                           <div className="space-y-1">
                             <h3 className="font-medium">{task.name}</h3>
                             <p className="text-xs text-muted-foreground">
-                              {t.dashboard.room}: {getRoomName(task.roomId)} • {t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}
+                              {getRoomName(task.roomId)} • {getPeriodicityLabel(task.periodicity)}
                             </p>
                           </div>
                           <div className="flex space-x-1">
