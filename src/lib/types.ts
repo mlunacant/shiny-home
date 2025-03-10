@@ -3,18 +3,20 @@ export interface House {
   address?: string
 }
 
-export interface Room {
+export type Room = {
   id: string
   name: string
-  type?: string
+  color: string
 }
 
-export interface Task {
+export type Task = {
   id: string
   name: string
-  description?: string
   roomId: string
-  periodicity: string // daily, weekly, biweekly, monthly, quarterly
+  periodicity: {
+    value: number
+    unit: "days" | "weeks" | "months"
+  }
   created: string // ISO date string
   lastCompleted: string | null // ISO date string
   nextDue: string // ISO date string
