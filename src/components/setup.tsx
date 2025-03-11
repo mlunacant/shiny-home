@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,6 +43,7 @@ export default function Setup() {
 
   const [showRoomForm, setShowRoomForm] = useState(false)
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>("all")
+  const roomFormRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -82,7 +83,7 @@ export default function Setup() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const name = formData.get("name") as string
-    const color = formData.get("color") as string
+    const color = formData.get("color") as string || "#000000"
 
     if (!name) {
       toast.error(t.validation.enterRoomName)
@@ -107,7 +108,7 @@ export default function Setup() {
       await createRoom(user.email, newRoom)
       setRooms(prev => [...prev, newRoom])
       toast.success(t.validation.roomAdded.replace("{{name}}", name))
-      e.currentTarget.reset()
+      roomFormRef.current?.reset()
       setShowRoomForm(false)
     } catch (error) {
       console.error('Error creating room:', error)
@@ -284,7 +285,7 @@ export default function Setup() {
             <CardContent>
               {showRoomForm && (
                 <div className="border rounded-lg p-4 mb-6">
-                  <form onSubmit={handleAddRoom} className="space-y-4">
+                  <form ref={roomFormRef} onSubmit={handleAddRoom} className="space-y-4">
                     <div className="grid gap-2">
                       <Label htmlFor="name">{t.setup.roomName}</Label>
                       <Input
