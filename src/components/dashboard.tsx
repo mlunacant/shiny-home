@@ -8,9 +8,11 @@ import { CheckCircle, AlertCircle, Clock, ChevronUp, ChevronDown, Calendar } fro
 import { toast } from "sonner"
 import type { Task, Room } from "@/lib/types"
 import { useI18n, replaceParams } from "@/lib/i18n"
+import { useAuth } from "@/lib/contexts/AuthContext"
 
 export default function Dashboard() {
   const { t, lang } = useI18n()
+  const { user } = useAuth()
   const [rooms, setRooms] = useState<Room[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [showNextWeekTasks, setShowNextWeekTasks] = useState(false)
@@ -32,6 +34,9 @@ export default function Dashboard() {
       setTasks(JSON.parse(savedTasks))
     }
   }, [])
+
+  // Filter tasks by current user
+  const userTasks = tasks.filter(task => task.userId === user?.email)
 
   const getPeriodicityLabel = (periodicity: { value: number, unit: "days" | "weeks" | "months" }): string => {
     const unit = t.frequency[periodicity.unit]
@@ -80,7 +85,7 @@ export default function Dashboard() {
     const now = new Date()
     const { start, end } = getWeekBounds(now)
     
-    return tasks.filter(task => {
+    return userTasks.filter(task => {
       const dueDate = new Date(task.nextDue)
       // Include tasks that are either overdue or due this week
       return dueDate <= end && (dueDate < start ? !task.lastCompleted : true)
@@ -91,7 +96,7 @@ export default function Dashboard() {
     const now = new Date()
     const { start, end } = getNextWeekBounds(now)
     
-    return tasks.filter(task => {
+    return userTasks.filter(task => {
       const dueDate = new Date(task.nextDue)
       return dueDate >= start && dueDate <= end
     }).sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime())
@@ -101,7 +106,7 @@ export default function Dashboard() {
     const now = new Date()
     now.setHours(0, 0, 0, 0)
     
-    return tasks.filter(task => {
+    return userTasks.filter(task => {
       const dueDate = new Date(task.nextDue)
       dueDate.setHours(0, 0, 0, 0)
       return dueDate.getTime() === now.getTime()
@@ -170,7 +175,7 @@ export default function Dashboard() {
   }
 
   // Sort tasks by due date (overdue first, then soon due)
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = [...userTasks].sort((a, b) => {
     const statusA = getTaskStatus(a)
     const statusB = getTaskStatus(b)
 
@@ -181,9 +186,6 @@ export default function Dashboard() {
 
     return new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime()
   })
-
-  // Filter tasks that need attention (overdue or due soon)
- 
 
   const formatCompletionDate = (date: string | null): string => {
     if (!date) return t.dashboard.completionStatus.neverCompleted
