@@ -30,6 +30,7 @@ export const es = {
   },
   setup: {
     addRoom: "Agregar Habitación",
+    editRoom: "Editar Habitación",
     addRoomDesc: "Agregar habitaciones a tu casa",
     roomName: "Nombre de la Habitación",
     roomNamePlaceholder: "Sala de Estar",
@@ -69,6 +70,7 @@ export const es = {
     enterRoomName: "Por favor ingresa un nombre de habitación",
     roomAdded: "{{name}} ha sido agregada a tu casa",
     roomRemoved: "La habitación ha sido eliminada de tu casa",
+    roomUpdated : "La habitación ha sido actualizada en tu casa",
     fillRequired: "Por favor completa todos los campos requeridos",
     taskAdded: "{{name}} ha sido agregada a tu calendario de limpieza",
     taskUpdated: "La tarea ha sido actualizada exitosamente",

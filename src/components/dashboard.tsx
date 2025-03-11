@@ -46,13 +46,52 @@ export default function Dashboard() {
     return room ? room.color : "#e5e7eb" // default to gray if room not found
   }
 
-  const getTasksDueNextWeek = () => {
-    const nextWeek = new Date(today)
-    nextWeek.setDate(today.getDate() + 7)
+  const getWeekBounds = (date: Date): { start: Date; end: Date } => {
+    const start = new Date(date)
+    // Get Monday (1) of current week. If today is Sunday (0), go back 6 days
+    const day = start.getDay()
+    const diff = start.getDate() - day + (day === 0 ? -6 : 1)
+    start.setDate(diff)
+    start.setHours(0, 0, 0, 0)
+
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6) // End of week (Sunday)
+    end.setHours(23, 59, 59, 999)
+
+    return { start, end }
+  }
+
+  const getNextWeekBounds = (date: Date): { start: Date; end: Date } => {
+    const thisWeek = getWeekBounds(date)
+    const nextWeekStart = new Date(thisWeek.end)
+    nextWeekStart.setDate(nextWeekStart.getDate() + 1)
+    nextWeekStart.setHours(0, 0, 0, 0)
     
-    return tasks.filter((task) => {
-      const nextDue = new Date(task.nextDue)
-      return nextDue > today && nextDue <= nextWeek
+    const nextWeekEnd = new Date(nextWeekStart)
+    nextWeekEnd.setDate(nextWeekStart.getDate() + 6)
+    nextWeekEnd.setHours(23, 59, 59, 999)
+
+    return { start: nextWeekStart, end: nextWeekEnd }
+  }
+
+  const getTasksDueThisWeek = () => {
+    const now = new Date()
+    const { start, end } = getWeekBounds(now)
+    
+    return tasks.filter(task => {
+      const dueDate = new Date(task.nextDue)
+      // Include tasks that are either overdue or due this week
+      return dueDate <= end && (dueDate < start ? !task.lastCompleted : true)
+    })
+  }
+
+  const getTasksDueNextWeek = () => {
+    const now = new Date()
+    const { start, end } = getNextWeekBounds(now)
+    
+    return tasks.filter(task => {
+      const dueDate = new Date(task.nextDue)
+      return dueDate >= start && dueDate <= end
     }).sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime())
   }
 
@@ -131,45 +170,7 @@ export default function Dashboard() {
   })
 
   // Filter tasks that need attention (overdue or due soon)
-  const tasksNeedingAttention = sortedTasks.filter((task) => {
-    const { status } = getTaskStatus(task)
-    return status === "overdue" || status === "due-soon"
-  })
-
-  // Add these new functions after getTaskStatus
-  const getWeekBounds = (date: Date): { start: Date; end: Date } => {
-    const start = new Date(date)
-    start.setDate(date.getDate() - date.getDay()) // Start of week (Sunday)
-    start.setHours(0, 0, 0, 0)
-
-    const end = new Date(start)
-    end.setDate(start.getDate() + 6) // End of week (Saturday)
-    end.setHours(23, 59, 59, 999)
-
-    return { start, end }
-  }
-
-  const getNextWeekBounds = (date: Date): { start: Date; end: Date } => {
-    const { start } = getWeekBounds(date)
-    const nextWeekStart = new Date(start)
-    nextWeekStart.setDate(start.getDate() + 7)
-    
-    const nextWeekEnd = new Date(nextWeekStart)
-    nextWeekEnd.setDate(nextWeekStart.getDate() + 6)
-    nextWeekEnd.setHours(23, 59, 59, 999)
-
-    return { start: nextWeekStart, end: nextWeekEnd }
-  }
-
-  const getTasksDueThisWeek = () => {
-    const now = new Date()
-    const { start, end } = getWeekBounds(now)
-    
-    return tasks.filter(task => {
-      const dueDate = new Date(task.nextDue)
-      return dueDate >= start && dueDate <= end
-    })
-  }
+ 
 
   const formatCompletionDate = (date: string | null): string => {
     if (!date) return t.dashboard.completionStatus.neverCompleted
@@ -235,14 +236,14 @@ export default function Dashboard() {
           <CardDescription>{t.dashboard.tasksNeedingAttentionDesc}</CardDescription>
         </CardHeader>
         <CardContent>
-          {tasksNeedingAttention.length === 0 ? (
+          {getTasksDueThisWeek().length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
               <CheckCircle className="mx-auto h-12 w-12 mb-2" />
               <p>{t.dashboard.allCaughtUp}</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {tasksNeedingAttention.map((task) => {
+              {getTasksDueThisWeek().map((task) => {
                 const { status, daysLeft } = getTaskStatus(task)
                 const roomColor = getRoomColor(task.roomId)
 

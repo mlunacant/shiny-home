@@ -30,6 +30,7 @@ export const en = {
   },
   setup: {
     addRoom: "Add Room",
+    editRoom: "Edit Room",
     addRoomDesc: "Add rooms to your house",
     roomName: "Room Name",
     roomNamePlaceholder: "Living Room",
@@ -65,6 +66,7 @@ export const en = {
     enterRoomName: "Please enter a room name",
     roomAdded: "{{name}} has been added to your house",
     roomRemoved: "The room has been removed from your house",
+    roomUpdated : "The room has been updated in your house",
     fillRequired: "Please fill in all required fields",
     taskAdded: "{{name}} has been added to your cleaning schedule",
     taskUpdated: "The task has been updated successfully",
