@@ -34,7 +34,6 @@ export default function AuthPage() {
           description: "Your account has been created successfully.",
         })
       }
-      router.push("/")
     } catch (error: any) {
       toast.error("Error", {
         description: error.message,

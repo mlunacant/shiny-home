@@ -24,22 +24,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
-      setLoading(false)
-
-      if (user) {
-        // Get the token and store it in a cookie
-        const token = await user.getIdToken()
-        Cookies.set('__firebase_auth_token', token, {
-          expires: 14, // 14 days
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax'
-        })
-        router.push('/')
-      } else {
-        // Remove the token when user is not authenticated
-        Cookies.remove('__firebase_auth_token')
+      try {
+        if (user) {
+          // Get the token and store it in a cookie
+          const token = await user.getIdToken()
+          Cookies.set('__firebase_auth_token', token, {
+            expires: 14, // 14 days
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/'
+          })
+          setUser(user)
+          // Only navigate if we're on the login page
+          if (window.location.pathname === '/login') {
+            router.push('/')
+          }
+        } else {
+          // Remove the token when user is not authenticated
+          Cookies.remove('__firebase_auth_token', { path: '/' })
+          setUser(null)
+          // Only navigate if we're not already on the login page
+          if (window.location.pathname !== '/login') {
+            router.push('/login')
+          }
+        }
+      } catch (error) {
+        console.error('Auth state change error:', error)
+        Cookies.remove('__firebase_auth_token', { path: '/' })
+        setUser(null)
         router.push('/login')
+      } finally {
+        setLoading(false)
       }
     })
 

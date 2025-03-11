@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { auth } from '@/lib/firebase/firebase'
 
 // List of public paths that don't require authentication
 const publicPaths = ['/login']
@@ -38,7 +37,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api routes
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
   ],
 } 
