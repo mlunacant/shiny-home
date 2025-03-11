@@ -55,6 +55,15 @@ export const en = {
     clearDate: "Clear date",
     cancel: "Cancel",
     save: "Save",
+    createTasks: "Create Tasks",
+    createTasksDesc: "Create a task for multiple rooms at once",
+    addTask: "Add Task",
+    selectRooms: "Select Rooms",
+    createRoomFirst: "Create at least one room first",
+    addNewTask: "Add New Task",
+    newTasks: "New Tasks",
+    existingTasks: "Existing Tasks",
+    tasksCreated: "Tasks have been created successfully",
   },
   frequency: {
     days: "Days",
@@ -73,5 +82,7 @@ export const en = {
     taskRemoved: "The task has been removed from your cleaning schedule",
     taskCompleted: "Task completed!",
     taskCompletedDesc: "The task has been marked as done.",
+    selectRooms: "Please select at least one room",
+    tasksCreated: "{{count}} tasks have been created successfully",
   },
 } 

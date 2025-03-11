@@ -55,6 +55,15 @@ export const es = {
     clearDate: "Borrar fecha",
     cancel: "Cancelar",
     save: "Guardar",
+    createTasks: "Crear Tareas",
+    createTasksDesc: "Crear una tarea para múltiples habitaciones a la vez",
+    addTask: "Agregar Tarea",
+    selectRooms: "Seleccionar Habitaciones",
+    createRoomFirst: "Crea al menos una habitación primero",
+    addNewTask: "Agregar Nueva Tarea",
+    newTasks: "Nuevas Tareas",
+    existingTasks: "Tareas Existentes",
+    tasksCreated: "Las tareas se han creado exitosamente",
   },
   frequency: {
     days: "Días",
@@ -77,5 +86,7 @@ export const es = {
     taskRemoved: "La tarea ha sido eliminada de tu calendario de limpieza",
     taskCompleted: "¡Tarea completada!",
     taskCompletedDesc: "La tarea ha sido marcada como completada.",
+    selectRooms: "Por favor selecciona al menos una habitación",
+    tasksCreated: "Se han creado {{count}} tareas exitosamente",
   },
 } 

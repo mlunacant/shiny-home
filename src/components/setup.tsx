@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Trash2, Plus, Home, Calendar, Edit, X, Check } from "lucide-react"
 import { toast } from "sonner"
 import type { Room, Task } from "@/lib/types"
@@ -75,6 +76,24 @@ export default function Setup() {
     name: "",
     color: "#fecaca",
     tasks: []
+  })
+  const [showTaskForm, setShowTaskForm] = useState(false)
+  const [newMultiRoomTask, setNewMultiRoomTask] = useState<{
+    name: string
+    periodicity: {
+      value: number
+      unit: "days" | "weeks" | "months"
+    }
+    lastCompleted: string | null
+    selectedRooms: string[]
+  }>({
+    name: "",
+    periodicity: {
+      value: 1,
+      unit: "weeks"
+    },
+    lastCompleted: null,
+    selectedRooms: []
   })
 
   useEffect(() => {
@@ -415,308 +434,497 @@ export default function Setup() {
     })
   }
 
+  const addMultiRoomTask = () => {
+    if (!newMultiRoomTask.name) {
+      toast.error(t.validation.fillRequired)
+      return
+    }
+
+    if (newMultiRoomTask.selectedRooms.length === 0) {
+      toast.error(t.validation.selectRooms)
+      return
+    }
+
+    const now = new Date()
+    const newTasks = newMultiRoomTask.selectedRooms.map(roomId => ({
+      id: `task-${Date.now()}-${Math.random()}`,
+      name: newMultiRoomTask.name,
+      roomId: roomId,
+      periodicity: newMultiRoomTask.periodicity,
+      created: now.toISOString(),
+      lastCompleted: newMultiRoomTask.lastCompleted,
+      nextDue: newMultiRoomTask.lastCompleted ? 
+        getNextDueDate(new Date(newMultiRoomTask.lastCompleted), newMultiRoomTask.periodicity) :
+        getNextDueDate(now, newMultiRoomTask.periodicity),
+    }))
+
+    const updatedTasks = [...tasks, ...newTasks]
+    setTasks(updatedTasks)
+    localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
+
+    // Reset form
+    setNewMultiRoomTask({
+      name: "",
+      periodicity: {
+        value: 1,
+        unit: "weeks"
+      },
+      lastCompleted: null,
+      selectedRooms: []
+    })
+    setShowTaskForm(false)
+
+    toast.success(replaceParams(t.validation.tasksCreated, { count: newTasks.length }))
+  }
+
+  const toggleRoomSelection = (roomId: string) => {
+    setNewMultiRoomTask(prev => ({
+      ...prev,
+      selectedRooms: prev.selectedRooms.includes(roomId)
+        ? prev.selectedRooms.filter(id => id !== roomId)
+        : [...prev.selectedRooms, roomId]
+    }))
+  }
+
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.setup.yourRooms}</CardTitle>
-          <CardDescription>{t.setup.manageRooms}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => setShowRoomForm(true)} className="w-full mb-6" disabled={showRoomForm}>
-            <Plus className="mr-2 h-4 w-4" /> {t.setup.addRoom}
-          </Button>
+      <Tabs defaultValue="rooms">
+        <TabsList>
+          <TabsTrigger value="rooms">{t.common.rooms}</TabsTrigger>
+          <TabsTrigger value="tasks">{t.common.tasks}</TabsTrigger>
+        </TabsList>
 
-          {showRoomForm && (
-            <div className="border rounded-lg p-4 mb-6 space-y-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="room-name">{t.setup.roomName}</Label>
-                  <Input
-                    id="room-name"
-                    placeholder={t.setup.roomNamePlaceholder}
-                    value={newRoom.name}
-                    onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
-                  />
-                </div>
+        <TabsContent value="rooms" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.setup.yourRooms}</CardTitle>
+              <CardDescription>{t.setup.manageRooms}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => setShowRoomForm(true)} className="w-full mb-6" disabled={showRoomForm}>
+                <Plus className="mr-2 h-4 w-4" /> {t.setup.addRoom}
+              </Button>
 
-                <div className="space-y-2">
-                  <Label>{t.setup.roomColor}</Label>
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-lg border"
-                      style={{ backgroundColor: newRoom.color }}
-                    />
-                    <Input
-                      type="color"
-                      value={newRoom.color}
-                      onChange={(e) => setNewRoom({ ...newRoom, color: e.target.value })}
-                      className="w-20 h-10 p-1 cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
+              {showRoomForm && (
+                <div className="border rounded-lg p-4 mb-6 space-y-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="room-name">{t.setup.roomName}</Label>
+                      <Input
+                        id="room-name"
+                        placeholder={t.setup.roomNamePlaceholder}
+                        value={newRoom.name}
+                        onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
+                      />
+                    </div>
 
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-2">{t.setup.associatedTasks}</h4>
-                
-                {/* Task list */}
-                {newRoomTasks.length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {newRoomTasks.map((task, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 border rounded">
-                        <div>
-                          <p className="font-medium">{task.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {getPeriodicityLabel(task.periodicity)}
-                          </p>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => removeTaskFromRoom(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add task form */}
-                <div className="flex gap-2 mb-4">
-                  <div className="flex-1">
-                    <Input
-                      placeholder={t.setup.taskNamePlaceholder}
-                      value={newRoomTaskInput.name}
-                      onChange={(e) => setNewRoomTaskInput({ 
-                        ...newRoomTaskInput, 
-                        name: e.target.value 
-                      })}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={30}
-                      value={newRoomTaskInput.periodicity.value}
-                      onChange={(e) => {
-                        const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
-                        setNewRoomTaskInput({
-                          ...newRoomTaskInput,
-                          periodicity: {
-                            ...newRoomTaskInput.periodicity,
-                            value
-                          }
-                        })
-                      }}
-                      className="w-20"
-                    />
-                    <Select
-                      value={newRoomTaskInput.periodicity.unit}
-                      onValueChange={(value: "days" | "weeks" | "months") => setNewRoomTaskInput({ 
-                        ...newRoomTaskInput, 
-                        periodicity: {
-                          ...newRoomTaskInput.periodicity,
-                          unit: value
-                        }
-                      })}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="days">{t.frequency.days}</SelectItem>
-                        <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
-                        <SelectItem value="months">{t.frequency.months}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={addTaskToRoom} variant="outline">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowRoomForm(false)
-                    setNewRoom({ name: "", color: getNextColor() })
-                    setNewRoomTasks([])
-                  }}
-                >
-                  {t.setup.cancel}
-                </Button>
-                <Button onClick={addRoom}>
-                  {t.setup.save}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {rooms.length === 0 && !showRoomForm ? (
-            <div className="text-center py-6 text-muted-foreground border rounded-lg">
-              <Home className="mx-auto h-12 w-12 mb-2" />
-              <p>{t.setup.noRoomsYet}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {rooms.map((room) => {
-                const roomTasks = sortTasks(tasks.filter((task) => task.roomId === room.id))
-                return (
-                  <div key={room.id} className="border rounded-lg" style={{ backgroundColor: room.color + "40" }}>
-                    <div className="flex items-center justify-between p-3 border-b">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <Label>{t.setup.roomColor}</Label>
+                      <div className="flex items-center gap-3">
                         <div 
-                          className="w-4 h-4 rounded-full" 
-                          style={{ backgroundColor: room.color }}
+                          className="w-10 h-10 rounded-lg border"
+                          style={{ backgroundColor: newRoom.color }}
                         />
-                        <p className="font-medium">{room.name}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => startEditRoom(room)}
-                          title={t.setup.editRoom}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => deleteRoom(room.id)}
-                          disabled={roomTasks.length > 0}
-                          title={roomTasks.length > 0 ? t.setup.deleteFirst : t.setup.deleteRoom}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Input
+                          type="color"
+                          value={newRoom.color}
+                          onChange={(e) => setNewRoom({ ...newRoom, color: e.target.value })}
+                          className="w-20 h-10 p-1 cursor-pointer"
+                        />
                       </div>
                     </div>
-                    {editingRoom === room.id ? (
-                      <div className="p-3 bg-muted/50">
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>{t.setup.roomName}</Label>
-                            <Input
-                              value={editRoomData.name}
-                              onChange={(e) => setEditRoomData({ 
-                                ...editRoomData, 
-                                name: e.target.value 
-                              })}
-                              placeholder={t.setup.roomNamePlaceholder}
-                            />
-                          </div>
+                  </div>
 
-                          <div className="space-y-2">
-                            <Label>{t.setup.roomColor}</Label>
-                            <div className="flex items-center gap-3">
-                              <div 
-                                className="w-10 h-10 rounded-lg border"
-                                style={{ backgroundColor: editRoomData.color }}
-                              />
-                              <Input
-                                type="color"
-                                value={editRoomData.color}
-                                onChange={(e) => setEditRoomData({ 
-                                  ...editRoomData, 
-                                  color: e.target.value 
-                                })}
-                                className="w-20 h-10 p-1 cursor-pointer"
-                              />
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-2">{t.setup.associatedTasks}</h4>
+                    
+                    {/* Task list */}
+                    {newRoomTasks.length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        {newRoomTasks.map((task, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 border rounded">
+                            <div>
+                              <p className="font-medium">{task.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {getPeriodicityLabel(task.periodicity)}
+                              </p>
                             </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => removeTaskFromRoom(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
+                        ))}
+                      </div>
+                    )}
 
-                          <div className="border-t pt-4">
-                            <h4 className="font-medium mb-2">{t.setup.associatedTasks}</h4>
-                            
-                            {/* Add new task form */}
-                            <div className="mb-4 border rounded-lg p-3 bg-background">
-                              <h5 className="text-sm font-medium mb-2">{t.setup.createTask}</h5>
-                              <div className="flex gap-2">
-                                <div className="flex-1">
+                    {/* Add task form */}
+                    <div className="flex gap-2 mb-4">
+                      <div className="flex-1">
+                        <Input
+                          placeholder={t.setup.taskNamePlaceholder}
+                          value={newRoomTaskInput.name}
+                          onChange={(e) => setNewRoomTaskInput({ 
+                            ...newRoomTaskInput, 
+                            name: e.target.value 
+                          })}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={newRoomTaskInput.periodicity.value}
+                          onChange={(e) => {
+                            const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
+                            setNewRoomTaskInput({
+                              ...newRoomTaskInput,
+                              periodicity: {
+                                ...newRoomTaskInput.periodicity,
+                                value
+                              }
+                            })
+                          }}
+                          className="w-20"
+                        />
+                        <Select
+                          value={newRoomTaskInput.periodicity.unit}
+                          onValueChange={(value: "days" | "weeks" | "months") => setNewRoomTaskInput({ 
+                            ...newRoomTaskInput, 
+                            periodicity: {
+                              ...newRoomTaskInput.periodicity,
+                              unit: value
+                            }
+                          })}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="days">{t.frequency.days}</SelectItem>
+                            <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
+                            <SelectItem value="months">{t.frequency.months}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={addTaskToRoom} variant="outline">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setShowRoomForm(false)
+                        setNewRoom({ name: "", color: getNextColor() })
+                        setNewRoomTasks([])
+                      }}
+                    >
+                      {t.setup.cancel}
+                    </Button>
+                    <Button onClick={addRoom}>
+                      {t.setup.save}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {rooms.length === 0 && !showRoomForm ? (
+                <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                  <Home className="mx-auto h-12 w-12 mb-2" />
+                  <p>{t.setup.noRoomsYet}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {rooms.map((room) => {
+                    const roomTasks = sortTasks(tasks.filter((task) => task.roomId === room.id))
+                    return (
+                      <div key={room.id} className="border rounded-lg" style={{ backgroundColor: room.color + "40" }}>
+                        <div className="flex items-center justify-between p-3 border-b">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-4 h-4 rounded-full" 
+                              style={{ backgroundColor: room.color }}
+                            />
+                            <p className="font-medium">{room.name}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => startEditRoom(room)}
+                              title={t.setup.editRoom}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => deleteRoom(room.id)}
+                              disabled={roomTasks.length > 0}
+                              title={roomTasks.length > 0 ? t.setup.deleteFirst : t.setup.deleteRoom}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        {editingRoom === room.id ? (
+                          <div className="p-3 bg-muted/50">
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label>{t.setup.roomName}</Label>
+                                <Input
+                                  value={editRoomData.name}
+                                  onChange={(e) => setEditRoomData({ 
+                                    ...editRoomData, 
+                                    name: e.target.value 
+                                  })}
+                                  placeholder={t.setup.roomNamePlaceholder}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>{t.setup.roomColor}</Label>
+                                <div className="flex items-center gap-3">
+                                  <div 
+                                    className="w-10 h-10 rounded-lg border"
+                                    style={{ backgroundColor: editRoomData.color }}
+                                  />
                                   <Input
-                                    placeholder={t.setup.taskNamePlaceholder}
-                                    value={newRoomTaskInput.name}
-                                    onChange={(e) => setNewRoomTaskInput({ 
-                                      ...newRoomTaskInput, 
-                                      name: e.target.value 
+                                    type="color"
+                                    value={editRoomData.color}
+                                    onChange={(e) => setEditRoomData({ 
+                                      ...editRoomData, 
+                                      color: e.target.value 
                                     })}
+                                    className="w-20 h-10 p-1 cursor-pointer"
                                   />
                                 </div>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    max={30}
-                                    value={newRoomTaskInput.periodicity.value}
-                                    onChange={(e) => {
-                                      const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
-                                      setNewRoomTaskInput({
-                                        ...newRoomTaskInput,
-                                        periodicity: {
-                                          ...newRoomTaskInput.periodicity,
-                                          value
-                                        }
-                                      })
-                                    }}
-                                    className="w-20"
-                                  />
-                                  <Select
-                                    value={newRoomTaskInput.periodicity.unit}
-                                    onValueChange={(value: "days" | "weeks" | "months") => setNewRoomTaskInput({ 
-                                      ...newRoomTaskInput, 
-                                      periodicity: {
-                                        ...newRoomTaskInput.periodicity,
-                                        unit: value
-                                      }
-                                    })}
-                                  >
-                                    <SelectTrigger className="w-32">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="days">{t.frequency.days}</SelectItem>
-                                      <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
-                                      <SelectItem value="months">{t.frequency.months}</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                              </div>
+
+                              <div className="border-t pt-4">
+                                <h4 className="font-medium mb-2">{t.setup.associatedTasks}</h4>
+                                
+                                {/* Add new task form */}
+                                <div className="mb-4 border rounded-lg p-3 bg-background">
+                                  <h5 className="text-sm font-medium mb-2">{t.setup.createTask}</h5>
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <Input
+                                        placeholder={t.setup.taskNamePlaceholder}
+                                        value={newRoomTaskInput.name}
+                                        onChange={(e) => setNewRoomTaskInput({ 
+                                          ...newRoomTaskInput, 
+                                          name: e.target.value 
+                                        })}
+                                      />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        max={30}
+                                        value={newRoomTaskInput.periodicity.value}
+                                        onChange={(e) => {
+                                          const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
+                                          setNewRoomTaskInput({
+                                            ...newRoomTaskInput,
+                                            periodicity: {
+                                              ...newRoomTaskInput.periodicity,
+                                              value
+                                            }
+                                          })
+                                        }}
+                                        className="w-20"
+                                      />
+                                      <Select
+                                        value={newRoomTaskInput.periodicity.unit}
+                                        onValueChange={(value: "days" | "weeks" | "months") => setNewRoomTaskInput({ 
+                                          ...newRoomTaskInput, 
+                                          periodicity: {
+                                            ...newRoomTaskInput.periodicity,
+                                            unit: value
+                                          }
+                                        })}
+                                      >
+                                        <SelectTrigger className="w-32">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="days">{t.frequency.days}</SelectItem>
+                                          <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
+                                          <SelectItem value="months">{t.frequency.months}</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <Button onClick={addTaskToEditRoom} variant="outline">
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </div>
-                                <Button onClick={addTaskToEditRoom} variant="outline">
-                                  <Plus className="h-4 w-4" />
+
+                                {/* New tasks to be added */}
+                                {editRoomData.tasks.length > 0 && (
+                                  <div className="space-y-2 mb-4">                               
+                                    {editRoomData.tasks.map((task, index) => (
+                                      <div key={index} className="flex items-center justify-between p-2 border rounded bg-background">
+                                        <div>
+                                          <p className="font-medium">{task.name}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {getPeriodicityLabel(task.periodicity)}
+                                          </p>
+                                        </div>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon"
+                                          onClick={() => removeTaskFromEditRoom(index)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Existing tasks */}
+                                {roomTasks.length > 0 && (
+                                  <div className="space-y-2">                                
+                                    {roomTasks.map((task) => (
+                                      <div key={task.id} className="text-sm flex items-center justify-between bg-background p-2 rounded">
+                                        {editingTask === task.id ? (
+                                          <div className="flex-1 space-y-3">
+                                            <div className="space-y-2">
+                                              <Label>{t.setup.taskName}</Label>
+                                              <Input
+                                                value={editTaskData.name}
+                                                onChange={(e) => setEditTaskData({ 
+                                                  ...editTaskData, 
+                                                  name: e.target.value 
+                                                })}
+                                                placeholder={t.setup.taskNamePlaceholder}
+                                              />
+                                            </div>
+                                            <div className="space-y-2">
+                                              <Label>{t.dashboard.frequency}</Label>
+                                              <div className="flex gap-2">
+                                                <div className="space-y-1">
+                                                  <Label className="text-xs">Value</Label>
+                                                  <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={30}
+                                                    value={editTaskData.periodicity.value}
+                                                    onChange={(e) => {
+                                                      const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
+                                                      setEditTaskData({
+                                                        ...editTaskData,
+                                                        periodicity: {
+                                                          ...editTaskData.periodicity,
+                                                          value
+                                                        }
+                                                      })
+                                                    }}
+                                                    className="w-20"
+                                                  />
+                                                </div>
+                                                <div className="space-y-1 flex-1">
+                                                  <Label className="text-xs">Unit</Label>
+                                                  <Select
+                                                    value={editTaskData.periodicity.unit}
+                                                    onValueChange={(value: "days" | "weeks" | "months") => setEditTaskData({ 
+                                                      ...editTaskData, 
+                                                      periodicity: {
+                                                        ...editTaskData.periodicity,
+                                                        unit: value
+                                                      }
+                                                    })}
+                                                  >
+                                                    <SelectTrigger className="w-32">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="days">{t.frequency.days}</SelectItem>
+                                                      <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
+                                                      <SelectItem value="months">{t.frequency.months}</SelectItem>
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label className="text-xs">Last completed</Label>
+                                                  <Input
+                                                    type="date"
+                                                    value={editTaskData.lastCompleted ? new Date(editTaskData.lastCompleted).toISOString().split('T')[0] : ''}
+                                                    onChange={(e) => setEditTaskData({
+                                                      ...editTaskData,
+                                                      lastCompleted: e.target.value ? new Date(e.target.value).toISOString() : null
+                                                    })}
+                                                    className="w-40"
+                                                  />
+                                                </div>
+                                                <div className="flex gap-2 self-end">
+                                                  <Button variant="outline" size="icon" onClick={cancelEditTask}>
+                                                    <X className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button size="icon" onClick={() => saveEditTask(task.id)}>
+                                                    <Check className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <div className="space-y-1">
+                                              <p className="font-medium">{task.name}</p>
+                                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <span>{t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}</span>
+                                                <span>•</span>
+                                                <span className="flex items-center gap-1">
+                                                  <Calendar className="h-3 w-3" />
+                                                  {formatCompletionDate(task.lastCompleted)}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                              <Button variant="ghost" size="icon" onClick={() => startEditTask(task)}>
+                                                <Edit className="h-4 w-4" />
+                                              </Button>
+                                              <Button variant="ghost" size="icon" onClick={() => deleteTask(task.id)}>
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex justify-end space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={cancelEditRoom}
+                                >
+                                  {t.setup.cancel}
+                                </Button>
+                                <Button onClick={() => saveEditRoom(room.id)}>
+                                  {t.setup.save}
                                 </Button>
                               </div>
                             </div>
-
-                            {/* New tasks to be added */}
-                            {editRoomData.tasks.length > 0 && (
-                              <div className="space-y-2 mb-4">                               
-                                {editRoomData.tasks.map((task, index) => (
-                                  <div key={index} className="flex items-center justify-between p-2 border rounded bg-background">
-                                    <div>
-                                      <p className="font-medium">{task.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {getPeriodicityLabel(task.periodicity)}
-                                      </p>
-                                    </div>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      onClick={() => removeTaskFromEditRoom(index)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Existing tasks */}
-                            {roomTasks.length > 0 && (
-                              <div className="space-y-2">                                
+                          </div>
+                        ) : (
+                          roomTasks.length > 0 && (
+                            <div className="p-3 bg-muted/50">
+                              <p className="text-sm font-medium mb-2">{t.setup.associatedTasks}:</p>
+                              <div className="space-y-2">
                                 {roomTasks.map((task) => (
                                   <div key={task.id} className="text-sm flex items-center justify-between bg-background p-2 rounded">
                                     {editingTask === task.id ? (
@@ -826,146 +1034,171 @@ export default function Setup() {
                                   </div>
                                 ))}
                               </div>
-                            )}
-                          </div>
-
-                          <div className="flex justify-end space-x-2">
-                            <Button 
-                              variant="outline" 
-                              onClick={cancelEditRoom}
-                            >
-                              {t.setup.cancel}
-                            </Button>
-                            <Button onClick={() => saveEditRoom(room.id)}>
-                              {t.setup.save}
-                            </Button>
-                          </div>
-                        </div>
+                            </div>
+                          )
+                        )}
                       </div>
-                    ) : (
-                      roomTasks.length > 0 && (
-                        <div className="p-3 bg-muted/50">
-                          <p className="text-sm font-medium mb-2">{t.setup.associatedTasks}:</p>
-                          <div className="space-y-2">
-                            {roomTasks.map((task) => (
-                              <div key={task.id} className="text-sm flex items-center justify-between bg-background p-2 rounded">
-                                {editingTask === task.id ? (
-                                  <div className="flex-1 space-y-3">
-                                    <div className="space-y-2">
-                                      <Label>{t.setup.taskName}</Label>
-                                      <Input
-                                        value={editTaskData.name}
-                                        onChange={(e) => setEditTaskData({ 
-                                          ...editTaskData, 
-                                          name: e.target.value 
-                                        })}
-                                        placeholder={t.setup.taskNamePlaceholder}
-                                      />
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label>{t.dashboard.frequency}</Label>
-                                      <div className="flex gap-2">
-                                        <div className="space-y-1">
-                                          <Label className="text-xs">Value</Label>
-                                          <Input
-                                            type="number"
-                                            min={1}
-                                            max={30}
-                                            value={editTaskData.periodicity.value}
-                                            onChange={(e) => {
-                                              const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
-                                              setEditTaskData({
-                                                ...editTaskData,
-                                                periodicity: {
-                                                  ...editTaskData.periodicity,
-                                                  value
-                                                }
-                                              })
-                                            }}
-                                            className="w-20"
-                                          />
-                                        </div>
-                                        <div className="space-y-1 flex-1">
-                                          <Label className="text-xs">Unit</Label>
-                                          <Select
-                                            value={editTaskData.periodicity.unit}
-                                            onValueChange={(value: "days" | "weeks" | "months") => setEditTaskData({ 
-                                              ...editTaskData, 
-                                              periodicity: {
-                                                ...editTaskData.periodicity,
-                                                unit: value
-                                              }
-                                            })}
-                                          >
-                                            <SelectTrigger className="w-32">
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="days">{t.frequency.days}</SelectItem>
-                                              <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
-                                              <SelectItem value="months">{t.frequency.months}</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <Label className="text-xs">Last completed</Label>
-                                          <Input
-                                            type="date"
-                                            value={editTaskData.lastCompleted ? new Date(editTaskData.lastCompleted).toISOString().split('T')[0] : ''}
-                                            onChange={(e) => setEditTaskData({
-                                              ...editTaskData,
-                                              lastCompleted: e.target.value ? new Date(e.target.value).toISOString() : null
-                                            })}
-                                            className="w-40"
-                                          />
-                                        </div>
-                                        <div className="flex gap-2 self-end">
-                                          <Button variant="outline" size="icon" onClick={cancelEditTask}>
-                                            <X className="h-4 w-4" />
-                                          </Button>
-                                          <Button size="icon" onClick={() => saveEditTask(task.id)}>
-                                            <Check className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="space-y-1">
-                                      <p className="font-medium">{task.name}</p>
-                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span>{t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}</span>
-                                        <span>•</span>
-                                        <span className="flex items-center gap-1">
-                                          <Calendar className="h-3 w-3" />
-                                          {formatCompletionDate(task.lastCompleted)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Button variant="ghost" size="icon" onClick={() => startEditTask(task)}>
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button variant="ghost" size="icon" onClick={() => deleteTask(task.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            ))}
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.setup.createTasks}</CardTitle>
+              <CardDescription>{t.setup.createTasksDesc}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => setShowTaskForm(true)} 
+                className="w-full mb-6" 
+                disabled={showTaskForm || rooms.length === 0}
+              >
+                <Plus className="mr-2 h-4 w-4" /> {t.setup.addTask}
+              </Button>
+
+              {showTaskForm && (
+                <div className="border rounded-lg p-4 mb-6 space-y-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-name">{t.setup.taskName}</Label>
+                      <Input
+                        id="task-name"
+                        placeholder={t.setup.taskNamePlaceholder}
+                        value={newMultiRoomTask.name}
+                        onChange={(e) => setNewMultiRoomTask(prev => ({ 
+                          ...prev, 
+                          name: e.target.value 
+                        }))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{t.dashboard.frequency}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={newMultiRoomTask.periodicity.value}
+                          onChange={(e) => {
+                            const value = Math.min(30, Math.max(1, parseInt(e.target.value) || 1))
+                            setNewMultiRoomTask(prev => ({
+                              ...prev,
+                              periodicity: {
+                                ...prev.periodicity,
+                                value
+                              }
+                            }))
+                          }}
+                          className="w-20"
+                        />
+                        <Select
+                          value={newMultiRoomTask.periodicity.unit}
+                          onValueChange={(value: "days" | "weeks" | "months") => setNewMultiRoomTask(prev => ({ 
+                            ...prev, 
+                            periodicity: {
+                              ...prev.periodicity,
+                              unit: value
+                            }
+                          }))}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="days">{t.frequency.days}</SelectItem>
+                            <SelectItem value="weeks">{t.frequency.weeks}</SelectItem>
+                            <SelectItem value="months">{t.frequency.months}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{t.setup.lastCompleted}</Label>
+                      <Input
+                        type="date"
+                        value={newMultiRoomTask.lastCompleted ? new Date(newMultiRoomTask.lastCompleted).toISOString().split('T')[0] : ''}
+                        onChange={(e) => setNewMultiRoomTask(prev => ({
+                          ...prev,
+                          lastCompleted: e.target.value ? new Date(e.target.value).toISOString() : null
+                        }))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{t.setup.selectRooms}</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                        {rooms.map((room) => (
+                          <div 
+                            key={room.id} 
+                            className="flex items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-accent"
+                            style={{ backgroundColor: room.color + "20" }}
+                          >
+                            <Checkbox
+                              id={`room-${room.id}`}
+                              checked={newMultiRoomTask.selectedRooms.includes(room.id)}
+                              onCheckedChange={() => toggleRoomSelection(room.id)}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <div 
+                                className="w-3 h-3 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: room.color }}
+                              />
+                              <label 
+                                htmlFor={`room-${room.id}`}
+                                className="text-sm font-medium leading-none cursor-pointer select-none flex-1"
+                              >
+                                {room.name}
+                              </label>
+                            </div>
                           </div>
-                        </div>
-                      )
-                    )}
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setShowTaskForm(false)
+                        setNewMultiRoomTask({
+                          name: "",
+                          periodicity: {
+                            value: 1,
+                            unit: "weeks"
+                          },
+                          lastCompleted: null,
+                          selectedRooms: []
+                        })
+                      }}
+                    >
+                      {t.setup.cancel}
+                    </Button>
+                    <Button onClick={addMultiRoomTask}>
+                      {t.setup.save}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!showTaskForm && rooms.length === 0 && (
+                <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                  <Home className="mx-auto h-12 w-12 mb-2" />
+                  <p>{t.setup.createRoomFirst}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
