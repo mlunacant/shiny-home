@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Trash2, Plus, Home, Calendar, Edit, X, Check } from "lucide-react"
+import { Trash2, Plus, Home, Calendar, Edit, X, Check, Clock } from "lucide-react"
 import { toast } from "sonner"
 import type { Room, Task } from "@/lib/types"
 import { useI18n, replaceParams } from "@/lib/i18n"
@@ -47,6 +47,7 @@ export default function Setup() {
 
   const userRooms = rooms.filter(room => room.userId === user?.email)
   const [showRoomForm, setShowRoomForm] = useState(false)
+  const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>("all")
 
   useEffect(() => {
     // Load rooms and tasks from localStorage
@@ -197,6 +198,33 @@ export default function Setup() {
         ? prev.selectedRooms.filter(id => id !== roomId)
         : [...prev.selectedRooms, roomId]
     }))
+  }
+
+  // Get user tasks
+  const userTasks = tasks.filter(task => task.userId === user?.email)
+
+  // Filter tasks by selected room and sort by due date
+  const filteredAndSortedTasks = userTasks
+    .filter(task => selectedRoomFilter === "all" || task.roomId === selectedRoomFilter)
+    .sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime())
+
+  // Format due date
+  const formatDueDate = (date: string): string => {
+    const dueDate = new Date(date)
+    return dueDate.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  // Delete task
+  const handleDeleteTask = (taskId: string) => {
+    const updatedTasks = tasks.filter(task => task.id !== taskId)
+    setTasks(updatedTasks)
+    localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
+    toast.success(t.validation.taskRemoved)
   }
 
   return (
@@ -468,6 +496,90 @@ export default function Setup() {
                 <div className="text-center py-6 text-muted-foreground border rounded-lg">
                   <Home className="mx-auto h-12 w-12 mb-2" />
                   <p>{t.setup.createRoomFirst}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Existing Tasks List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.setup.yourTasks}</CardTitle>
+              <CardDescription>{t.setup.manageTasks}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userTasks.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                  <Clock className="mx-auto h-12 w-12 mb-2" />
+                  <p>{t.setup.noTasksYet}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Room filter */}
+                  <div className="flex items-center gap-2">
+                    <Label>{t.setup.filterByRoom}</Label>
+                    <Select
+                      value={selectedRoomFilter}
+                      onValueChange={setSelectedRoomFilter}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.setup.allRooms}</SelectItem>
+                        {userRooms.map((room) => (
+                          <SelectItem key={room.id} value={room.id}>
+                            {room.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Tasks list */}
+                  <div className="space-y-4">
+                    {filteredAndSortedTasks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        {t.setup.noTasksInRoom}
+                      </p>
+                    ) : (
+                      filteredAndSortedTasks.map((task) => {
+                        const room = userRooms.find(r => r.id === task.roomId)
+                        if (!room) return null
+
+                        return (
+                          <div
+                            key={task.id}
+                            className="flex items-center justify-between p-4 border rounded-lg"
+                            style={{ backgroundColor: room.color + "40" }}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: room.color }}
+                                />
+                                <span className="font-medium">{task.name}</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {t.dashboard.room}: {room.name} • {t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t.setup.nextDue}: {formatDueDate(task.nextDue)}
+                              </p>
+                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteTask(task.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>

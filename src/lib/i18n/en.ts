@@ -68,6 +68,10 @@ export const en = {
     newTasks: "New Tasks",
     existingTasks: "Existing Tasks",
     tasksCreated: "Tasks have been created successfully",
+    filterByRoom: "Filter by Room",
+    allRooms: "All Rooms",
+    noTasksInRoom: "No tasks found for the selected room",
+    nextDue: "Next due",
   },
   frequency: {
     days: "Days",
