@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [showNextWeekTasks, setShowNextWeekTasks] = useState(false)
+  const [showNeedingAttention, setShowNeedingAttention] = useState(true)
+  const [showTodayTasks, setShowTodayTasks] = useState(true)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -93,6 +95,17 @@ export default function Dashboard() {
       const dueDate = new Date(task.nextDue)
       return dueDate >= start && dueDate <= end
     }).sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime())
+  }
+
+  const getTasksDueToday = () => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    
+    return tasks.filter(task => {
+      const dueDate = new Date(task.nextDue)
+      dueDate.setHours(0, 0, 0, 0)
+      return dueDate.getTime() === now.getTime()
+    })
   }
 
   const markTaskComplete = (taskId: string) => {
@@ -208,7 +221,17 @@ export default function Dashboard() {
         <h2 className="text-3xl font-bold tracking-tight">{t.common.dashboard}</h2>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.dashboard.tasksToday}</CardTitle>
+            <CardDescription>{t.dashboard.tasksTodayDesc}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{getTasksDueToday().length}</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>{t.dashboard.tasksThisWeek}</CardTitle>
@@ -231,63 +254,138 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t.dashboard.tasksNeedingAttention}</CardTitle>
-          <CardDescription>{t.dashboard.tasksNeedingAttentionDesc}</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>{t.dashboard.tasksToday}</CardTitle>
+            <CardDescription>{t.dashboard.tasksTodayDesc}</CardDescription>
+          </div>
+          <Button 
+            variant="ghost" 
+            className="h-8 w-8 p-0" 
+            onClick={() => setShowTodayTasks(!showTodayTasks)}
+          >
+            {showTodayTasks ? 
+              <ChevronUp className="h-4 w-4" /> : 
+              <ChevronDown className="h-4 w-4" />
+            }
+          </Button>
         </CardHeader>
-        <CardContent>
-          {getTasksDueThisWeek().length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <CheckCircle className="mx-auto h-12 w-12 mb-2" />
-              <p>{t.dashboard.allCaughtUp}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {getTasksDueThisWeek().map((task) => {
-                const { status, daysLeft } = getTaskStatus(task)
-                const roomColor = getRoomColor(task.roomId)
-
-                return (
-                  <div 
-                    key={task.id} 
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                    style={{ backgroundColor: roomColor + "40" }}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: roomColor }}
-                        />
-                        <h3 className="font-medium">{task.name}</h3>
-                        {status === "overdue" ? (
-                          <Badge variant="destructive" className="flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            {replaceParams(t.dashboard.overdueBy, { days: Math.abs(daysLeft) })}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="flex items-center gap-1 bg-yellow-500">
-                            <Clock className="h-3 w-3" />
-                            {replaceParams(t.dashboard.dueIn, { days: daysLeft })}
-                          </Badge>
-                        )}
+        {showTodayTasks && (
+          <CardContent>
+            {getTasksDueToday().length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <CheckCircle className="mx-auto h-12 w-12 mb-2" />
+                <p>{t.dashboard.noTasksToday}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {getTasksDueToday().map((task) => {
+                  const roomColor = getRoomColor(task.roomId)
+                  return (
+                    <div 
+                      key={task.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                      style={{ backgroundColor: roomColor + "40" }}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: roomColor }}
+                          />
+                          <h3 className="font-medium">{task.name}</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t.dashboard.room}: {getRoomName(task.roomId)} • {t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCompletionDate(task.lastCompleted)}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {t.dashboard.room}: {getRoomName(task.roomId)} • {t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCompletionDate(task.lastCompleted)}
-                      </p>
+                      <Button onClick={() => markTaskComplete(task.id)}>
+                        {t.dashboard.markComplete}
+                      </Button>
                     </div>
-                    <Button onClick={() => markTaskComplete(task.id)}>
-                      {t.dashboard.markComplete}
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>{t.dashboard.tasksNeedingAttention}</CardTitle>
+            <CardDescription>{t.dashboard.tasksNeedingAttentionDesc}</CardDescription>
+          </div>
+          <Button 
+            variant="ghost" 
+            className="h-8 w-8 p-0" 
+            onClick={() => setShowNeedingAttention(!showNeedingAttention)}
+          >
+            {showNeedingAttention ? 
+              <ChevronUp className="h-4 w-4" /> : 
+              <ChevronDown className="h-4 w-4" />
+            }
+          </Button>
+        </CardHeader>
+        {showNeedingAttention && (
+          <CardContent>
+            {getTasksDueThisWeek().length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <CheckCircle className="mx-auto h-12 w-12 mb-2" />
+                <p>{t.dashboard.allCaughtUp}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {getTasksDueThisWeek().map((task) => {
+                  const { status, daysLeft } = getTaskStatus(task)
+                  const roomColor = getRoomColor(task.roomId)
+
+                  return (
+                    <div 
+                      key={task.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                      style={{ backgroundColor: roomColor + "40" }}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: roomColor }}
+                          />
+                          <h3 className="font-medium">{task.name}</h3>
+                          {status === "overdue" ? (
+                            <Badge variant="destructive" className="flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {replaceParams(t.dashboard.overdueBy, { days: Math.abs(daysLeft) })}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="flex items-center gap-1 bg-yellow-500">
+                              <Clock className="h-3 w-3" />
+                              {replaceParams(t.dashboard.dueIn, { days: daysLeft })}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t.dashboard.room}: {getRoomName(task.roomId)} • {t.dashboard.frequency}: {getPeriodicityLabel(task.periodicity)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCompletionDate(task.lastCompleted)}
+                        </p>
+                      </div>
+                      <Button onClick={() => markTaskComplete(task.id)}>
+                        {t.dashboard.markComplete}
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       <Card>

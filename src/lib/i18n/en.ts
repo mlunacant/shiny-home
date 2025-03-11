@@ -7,6 +7,9 @@ export const en = {
     add: "Add",
   },
   dashboard: {
+    tasksToday: "Today's Tasks",
+    tasksTodayDesc: "Tasks that need to be done today",
+    noTasksToday: "No tasks scheduled for today",
     tasksThisWeek: "Tasks Due This Week",
     tasksThisWeekDesc: "Tasks to be done by Sunday",
     nextWeekTasks: "Next Week Tasks",
