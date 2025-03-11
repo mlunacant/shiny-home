@@ -13,18 +13,14 @@ import { toast } from "sonner"
 import type { Room, Task } from "@/lib/types"
 import { useI18n, replaceParams } from "@/lib/i18n"
 import { useAuth } from "@/lib/contexts/AuthContext"
+import { createRoom, getRooms, deleteRoom, createTask, getTasks, deleteTask, getTasksByRoom } from "@/lib/firebase/firebaseUtils"
 
 export default function Setup() {
   const { t, lang } = useI18n()
   const { user } = useAuth()
-  const [rooms, setRooms] = useState<Room[]>(() => {
-    const savedRooms = localStorage.getItem("house-rooms")
-    return savedRooms ? JSON.parse(savedRooms) : []
-  })
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const savedTasks = localStorage.getItem("cleaning-tasks")
-    return savedTasks ? JSON.parse(savedTasks) : []
-  })
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [newMultiRoomTask, setNewMultiRoomTask] = useState<{
@@ -45,23 +41,31 @@ export default function Setup() {
     selectedRooms: []
   })
 
-  const userRooms = rooms.filter(room => room.userId === user?.email)
   const [showRoomForm, setShowRoomForm] = useState(false)
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>("all")
 
   useEffect(() => {
-    // Load rooms and tasks from localStorage
-    const savedRooms = localStorage.getItem("house-rooms")
-    const savedTasks = localStorage.getItem("cleaning-tasks")
-
-    if (savedRooms) {
-      setRooms(JSON.parse(savedRooms))
+    const loadData = async () => {
+      if (!user?.email) return
+      
+      try {
+        setLoading(true)
+        const [roomsData, tasksData] = await Promise.all([
+          getRooms(user.email),
+          getTasks(user.email)
+        ])
+        setRooms(roomsData)
+        setTasks(tasksData)
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error(t.validation.error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    if (savedTasks) {
-      setTasks(JSON.parse(savedTasks))
-    }
-  }, [])
+    loadData()
+  }, [user?.email])
 
   // Get tasks for a specific room
   const getRoomTasks = (roomId: string) => {
@@ -74,7 +78,7 @@ export default function Setup() {
   }
 
   // Room functions
-  const handleAddRoom = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddRoom = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const name = formData.get("name") as string
@@ -99,35 +103,46 @@ export default function Setup() {
       updated: new Date().toISOString()
     }
 
-    const updatedRooms = [...rooms, newRoom]
-    setRooms(updatedRooms)
-    localStorage.setItem("house-rooms", JSON.stringify(updatedRooms))
-    toast.success(t.validation.roomAdded.replace("{{name}}", name))
-    e.currentTarget.reset()
+    try {
+      await createRoom(user.email, newRoom)
+      setRooms(prev => [...prev, newRoom])
+      toast.success(t.validation.roomAdded.replace("{{name}}", name))
+      e.currentTarget.reset()
+      setShowRoomForm(false)
+    } catch (error) {
+      console.error('Error creating room:', error)
+      toast.error(t.validation.error)
+    }
   }
 
-  const handleDeleteRoom = (roomId: string) => {
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!user?.email) {
+      toast.error("User not authenticated")
+      return
+    }
+
     // Check if room belongs to current user
     const room = rooms.find(r => r.id === roomId)
-    if (room?.userId !== user?.email) {
+    if (room?.userId !== user.email) {
       toast.error("You can only delete your own rooms")
       return
     }
 
-    const tasks = JSON.parse(localStorage.getItem("cleaning-tasks") || "[]") as Task[]
-    const hasAssociatedTasks = tasks.some(task => task.roomId === roomId)
-
-    if (hasAssociatedTasks) {
+    const roomTasks = tasks.filter(task => task.roomId === roomId)
+    if (roomTasks.length > 0) {
       toast.error(t.setup.deleteFirst)
       return
     }
 
-    const updatedRooms = rooms.filter(room => room.id !== roomId)
-    setRooms(updatedRooms)
-    localStorage.setItem("house-rooms", JSON.stringify(updatedRooms))
-    toast.success(t.validation.roomRemoved)
+    try {
+      await deleteRoom(user.email, roomId)
+      setRooms(prev => prev.filter(room => room.id !== roomId))
+      toast.success(t.validation.roomRemoved)
+    } catch (error) {
+      console.error('Error deleting room:', error)
+      toast.error(t.validation.error)
+    }
   }
-
 
   const getNextDueDate = (date: Date, periodicity: { value: number, unit: "days" | "weeks" | "months" }): string => {
     const nextDate = new Date(date)
@@ -147,7 +162,7 @@ export default function Setup() {
     return nextDate.toISOString()
   }
 
-  const addMultiRoomTask = () => {
+  const addMultiRoomTask = async () => {
     if (!newMultiRoomTask.name || !user?.email) {
       toast.error(t.validation.fillRequired)
       return
@@ -172,23 +187,27 @@ export default function Setup() {
         getNextDueDate(now, newMultiRoomTask.periodicity),
     } as Task))
 
-    const updatedTasks = [...tasks, ...newTasks]
-    setTasks(updatedTasks)
-    localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
+    try {
+      await Promise.all(newTasks.map(task => createTask(user.email!, task)))
+      setTasks(prev => [...prev, ...newTasks])
+      
+      // Reset form
+      setNewMultiRoomTask({
+        name: "",
+        periodicity: {
+          value: 1,
+          unit: "weeks"
+        },
+        lastCompleted: null,
+        selectedRooms: []
+      })
+      setShowTaskForm(false)
 
-    // Reset form
-    setNewMultiRoomTask({
-      name: "",
-      periodicity: {
-        value: 1,
-        unit: "weeks"
-      },
-      lastCompleted: null,
-      selectedRooms: []
-    })
-    setShowTaskForm(false)
-
-    toast.success(replaceParams(t.validation.tasksCreated, { count: newTasks.length }))
+      toast.success(replaceParams(t.validation.tasksCreated, { count: newTasks.length }))
+    } catch (error) {
+      console.error('Error creating tasks:', error)
+      toast.error(t.validation.error)
+    }
   }
 
   const toggleRoomSelection = (roomId: string) => {
@@ -198,6 +217,30 @@ export default function Setup() {
         ? prev.selectedRooms.filter(id => id !== roomId)
         : [...prev.selectedRooms, roomId]
     }))
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user?.email) {
+      toast.error("User not authenticated")
+      return
+    }
+
+    try {
+      await deleteTask(user.email, taskId)
+      setTasks(prev => prev.filter(task => task.id !== taskId))
+      toast.success(t.validation.taskRemoved)
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      toast.error(t.validation.error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[200px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   // Get user tasks
@@ -217,14 +260,6 @@ export default function Setup() {
       month: 'long',
       day: 'numeric'
     })
-  }
-
-  // Delete task
-  const handleDeleteTask = (taskId: string) => {
-    const updatedTasks = tasks.filter(task => task.id !== taskId)
-    setTasks(updatedTasks)
-    localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
-    toast.success(t.validation.taskRemoved)
   }
 
   return (
@@ -283,14 +318,14 @@ export default function Setup() {
                 </div>
               )}
 
-              {userRooms.length === 0 ? (
+              {rooms.length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground border rounded-lg">
                   <Home className="mx-auto h-12 w-12 mb-2" />
                   <p>{t.setup.noRoomsYet}</p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {userRooms.map((room) => {
+                  {rooms.map((room) => {
                     const roomTasks = getRoomTasks(room.id)
                     return (
                       <div
@@ -359,7 +394,7 @@ export default function Setup() {
               <Button 
                 onClick={() => setShowTaskForm(true)} 
                 className="w-full mb-6" 
-                disabled={showTaskForm || userRooms.length === 0}
+                disabled={showTaskForm || rooms.length === 0}
               >
                 <Plus className="mr-2 h-4 w-4" /> {t.setup.addTask}
               </Button>
@@ -437,7 +472,7 @@ export default function Setup() {
                     <div className="space-y-2">
                       <Label>{t.setup.selectRooms}</Label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-                        {userRooms.map((room) => (
+                        {rooms.map((room) => (
                           <div 
                             key={room.id} 
                             className="flex items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-accent"
@@ -492,7 +527,7 @@ export default function Setup() {
                 </div>
               )}
 
-              {!showTaskForm && userRooms.length === 0 && (
+              {!showTaskForm && rooms.length === 0 && (
                 <div className="text-center py-6 text-muted-foreground border rounded-lg">
                   <Home className="mx-auto h-12 w-12 mb-2" />
                   <p>{t.setup.createRoomFirst}</p>
@@ -527,7 +562,7 @@ export default function Setup() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">{t.setup.allRooms}</SelectItem>
-                        {userRooms.map((room) => (
+                        {rooms.map((room) => (
                           <SelectItem key={room.id} value={room.id}>
                             {room.name}
                           </SelectItem>
@@ -544,7 +579,7 @@ export default function Setup() {
                       </p>
                     ) : (
                       filteredAndSortedTasks.map((task) => {
-                        const room = userRooms.find(r => r.id === task.roomId)
+                        const room = rooms.find(r => r.id === task.roomId)
                         if (!room) return null
 
                         return (

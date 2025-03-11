@@ -9,12 +9,14 @@ import { toast } from "sonner"
 import type { Task, Room } from "@/lib/types"
 import { useI18n, replaceParams } from "@/lib/i18n"
 import { useAuth } from "@/lib/contexts/AuthContext"
+import { getRooms, getTasks, updateTask } from "@/lib/firebase/firebaseUtils"
 
 export default function Dashboard() {
   const { t, lang } = useI18n()
   const { user } = useAuth()
   const [rooms, setRooms] = useState<Room[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   const [showNextWeekTasks, setShowNextWeekTasks] = useState(false)
   const [showNeedingAttention, setShowNeedingAttention] = useState(true)
   const [showTodayTasks, setShowTodayTasks] = useState(true)
@@ -22,18 +24,27 @@ export default function Dashboard() {
   today.setHours(0, 0, 0, 0)
 
   useEffect(() => {
-    // Load rooms and tasks from localStorage
-    const savedRooms = localStorage.getItem("house-rooms")
-    const savedTasks = localStorage.getItem("cleaning-tasks")
-
-    if (savedRooms) {
-      setRooms(JSON.parse(savedRooms))
+    const loadData = async () => {
+      if (!user?.email) return
+      
+      try {
+        setLoading(true)
+        const [roomsData, tasksData] = await Promise.all([
+          getRooms(user.email),
+          getTasks(user.email)
+        ])
+        setRooms(roomsData)
+        setTasks(tasksData)
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error(t.validation.error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    if (savedTasks) {
-      setTasks(JSON.parse(savedTasks))
-    }
-  }, [])
+    loadData()
+  }, [user?.email])
 
   // Filter tasks by current user
   const userTasks = tasks.filter(task => task.userId === user?.email)
@@ -50,7 +61,7 @@ export default function Dashboard() {
 
   const getRoomColor = (roomId: string): string => {
     const room = rooms.find((r) => r.id === roomId)
-    return room ? room.color : "#e5e7eb" // default to gray if room not found
+    return room ? room.color : "#000000"
   }
 
   const getWeekBounds = (date: Date): { start: Date; end: Date } => {
@@ -113,31 +124,33 @@ export default function Dashboard() {
     })
   }
 
-  const markTaskComplete = (taskId: string) => {
-    const updatedTasks = tasks.map((task) => {
-      if (task.id === taskId) {
-        const now = new Date()
-        const lastCompleted = now.toISOString()
-        return {
-          ...task,
-          lastCompleted,
-          nextDue: getNextDueDate(now, task.periodicity),
-        }
+  const handleMarkComplete = async (task: Task) => {
+    if (!user?.email) return
+
+    const now = new Date()
+    const nextDue = getNextDueDate(now, task.periodicity)
+    
+    try {
+      const updatedTask = {
+        ...task,
+        lastCompleted: now.toISOString(),
+        nextDue
       }
-      return task
-    })
-
-    setTasks(updatedTasks)
-    localStorage.setItem("cleaning-tasks", JSON.stringify(updatedTasks))
-
-    toast.success(t.validation.taskCompleted, {
-      description: t.validation.taskCompletedDesc,
-    })
+      
+      await updateTask(user.email, task.id, updatedTask)
+      setTasks(prev => prev.map(t => t.id === task.id ? updatedTask : t))
+      
+      toast.success(t.validation.taskCompleted, {
+        description: t.validation.taskCompletedDesc
+      })
+    } catch (error) {
+      console.error('Error updating task:', error)
+      toast.error(t.validation.error)
+    }
   }
 
   const getNextDueDate = (date: Date, periodicity: { value: number, unit: "days" | "weeks" | "months" }): string => {
     const nextDate = new Date(date)
-    nextDate.setHours(0, 0, 0, 0) // Reset time part for consistent comparison
 
     switch (periodicity.unit) {
       case "days":
@@ -215,6 +228,14 @@ export default function Dashboard() {
         day: 'numeric'
       })
     })
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[200px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   return (
@@ -304,7 +325,7 @@ export default function Dashboard() {
                           {formatCompletionDate(task.lastCompleted)}
                         </p>
                       </div>
-                      <Button onClick={() => markTaskComplete(task.id)}>
+                      <Button onClick={() => handleMarkComplete(task)}>
                         {t.dashboard.markComplete}
                       </Button>
                     </div>
@@ -378,7 +399,7 @@ export default function Dashboard() {
                           {formatCompletionDate(task.lastCompleted)}
                         </p>
                       </div>
-                      <Button onClick={() => markTaskComplete(task.id)}>
+                      <Button onClick={() => handleMarkComplete(task)}>
                         {t.dashboard.markComplete}
                       </Button>
                     </div>
@@ -448,7 +469,7 @@ export default function Dashboard() {
                           {formatCompletionDate(task.lastCompleted)}
                         </p>
                       </div>
-                      <Button onClick={() => markTaskComplete(task.id)}>
+                      <Button onClick={() => handleMarkComplete(task)}>
                         {t.dashboard.markComplete}
                       </Button>
                     </div>

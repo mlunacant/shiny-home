@@ -96,5 +96,6 @@ export const es = {
     taskCompletedDesc: "La tarea ha sido marcada como completada.",
     selectRooms: "Por favor selecciona al menos una habitación",
     tasksCreated: "Se han creado {{count}} tareas exitosamente",
+    error: "Ha ocurrido un error. Por favor intenta de nuevo.",
   },
 } 

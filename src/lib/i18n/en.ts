@@ -92,5 +92,6 @@ export const en = {
     taskCompletedDesc: "The task has been marked as done.",
     selectRooms: "Please select at least one room",
     tasksCreated: "{{count}} tasks have been created successfully",
+    error: "An error occurred. Please try again.",
   },
 } 
